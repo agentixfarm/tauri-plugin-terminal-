@@ -1,3 +1,23 @@
+## Default Permission
+
+Default permissions for the terminal plugin - allows all terminal operations
+
+#### This default permission set includes the following:
+
+- `allow-create-session`
+- `allow-destroy-session`
+- `allow-get-screen`
+- `allow-get-session`
+- `allow-get-session-count`
+- `allow-get-theme`
+- `allow-list-sessions`
+- `allow-list-themes`
+- `allow-poll-session`
+- `allow-resize-session`
+- `allow-set-theme`
+- `allow-write-bytes-to-session`
+- `allow-write-to-session`
+
 ## Permission Table
 
 <table>

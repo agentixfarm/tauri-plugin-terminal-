@@ -18,7 +18,6 @@
  */
 
 export { Terminal, type TerminalProps, type TerminalHandle } from "./Terminal";
-export { default as Terminal } from "./Terminal";
 
 // Re-export hooks for convenience
 export {

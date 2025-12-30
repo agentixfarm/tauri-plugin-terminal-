@@ -449,6 +449,12 @@
           "type": "string",
           "const": "deny-write-to-session",
           "markdownDescription": "Denies the write_to_session command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for the terminal plugin - allows all terminal operations\n#### This default permission set includes:\n\n- `allow-create-session`\n- `allow-destroy-session`\n- `allow-get-screen`\n- `allow-get-session`\n- `allow-get-session-count`\n- `allow-get-theme`\n- `allow-list-sessions`\n- `allow-list-themes`\n- `allow-poll-session`\n- `allow-resize-session`\n- `allow-set-theme`\n- `allow-write-bytes-to-session`\n- `allow-write-to-session`",
+          "type": "string",
+          "const": "default",
+          "markdownDescription": "Default permissions for the terminal plugin - allows all terminal operations\n#### This default permission set includes:\n\n- `allow-create-session`\n- `allow-destroy-session`\n- `allow-get-screen`\n- `allow-get-session`\n- `allow-get-session-count`\n- `allow-get-theme`\n- `allow-list-sessions`\n- `allow-list-themes`\n- `allow-poll-session`\n- `allow-resize-session`\n- `allow-set-theme`\n- `allow-write-bytes-to-session`\n- `allow-write-to-session`"
         }
       ]
     }

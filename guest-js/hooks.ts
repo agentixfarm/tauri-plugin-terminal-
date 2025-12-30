@@ -137,12 +137,48 @@ export function useTerminal(sessionId: string | null) {
     [sessionId]
   );
 
-  // Resize terminal
+  // Resize terminal with confirmation
   const resize = useCallback(
     async (cols: number, rows: number) => {
       if (!sessionId) return;
       try {
+        // Set up a promise that resolves when we receive resize confirmation
+        const resizePromise = new Promise<void>((resolve) => {
+          const handleResize = async (event: { payload: { session_id: string; cols: number; rows: number } }) => {
+            if (event.payload.session_id === sessionId &&
+                event.payload.cols === cols &&
+                event.payload.rows === rows) {
+              unlisten();
+              resolve();
+            }
+          };
+
+          let unlisten: () => void = () => {};
+          listen<{ session_id: string; cols: number; rows: number }>(
+            TERMINAL_EVENTS.TERMINAL_RESIZED,
+            handleResize
+          ).then((fn) => {
+            unlisten = fn;
+          });
+
+          // Timeout after 500ms and resolve anyway
+          setTimeout(() => {
+            unlisten();
+            resolve();
+          }, 500);
+        });
+
         await api.resizeSession(sessionId, cols, rows);
+
+        // Wait for resize confirmation or timeout
+        await resizePromise;
+
+        // Small additional delay for shell to process SIGWINCH
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Fetch updated screen
+        const s = await api.getScreen(sessionId);
+        setScreen(s);
       } catch (e) {
         setError(e instanceof Error ? e : new Error(String(e)));
       }

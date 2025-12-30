@@ -137,7 +137,16 @@ impl Session {
     /// Resize the session.
     pub fn resize(&mut self, cols: u16, rows: u16) -> Result<()> {
         self.terminal.resize(cols, rows);
-        self.pty.resize(cols, rows)
+        self.pty.resize(cols, rows)?;
+
+        // Emit resize event to notify frontend
+        let _ = self.event_sender.send(TerminalEvent::TerminalResized {
+            session_id: self.id.clone(),
+            cols,
+            rows,
+        });
+
+        Ok(())
     }
 
     /// Get the full screen state.

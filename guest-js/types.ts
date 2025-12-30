@@ -149,6 +149,7 @@ export interface Theme {
 export type TerminalEvent =
   | { type: "session_created"; session_id: string }
   | { type: "session_destroyed"; session_id: string }
+  | { type: "terminal_resized"; session_id: string; cols: number; rows: number }
   | { type: "screen_update"; session_id: string; changes: CellChange[]; cursor: Cursor; title?: string }
   | { type: "screen_refresh"; session_id: string; screen: string }
   | { type: "bell"; session_id: string }
@@ -165,6 +166,7 @@ export type TerminalEvent =
 export const TERMINAL_EVENTS = {
   SESSION_CREATED: "terminal://session-created",
   SESSION_DESTROYED: "terminal://session-destroyed",
+  TERMINAL_RESIZED: "terminal://terminal-resized",
   SCREEN_UPDATE: "terminal://screen-update",
   SCREEN_REFRESH: "terminal://screen-refresh",
   BELL: "terminal://bell",

@@ -112,6 +112,11 @@ impl Terminal {
         self.size = Size { cols, rows };
         let mut parser = self.parser.lock();
         parser.set_size(rows, cols);
+
+        // Clear prev_contents cache to force a full refresh after resize
+        // This ensures the frontend gets the complete new screen state
+        let mut prev = self.prev_contents.lock();
+        *prev = None;
     }
 
     /// Get cursor state.

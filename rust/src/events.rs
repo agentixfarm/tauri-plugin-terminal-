@@ -17,6 +17,13 @@ pub enum TerminalEvent {
         session_id: String,
     },
 
+    /// Terminal was resized.
+    TerminalResized {
+        session_id: String,
+        cols: u16,
+        rows: u16,
+    },
+
     /// Screen content was updated.
     ScreenUpdate(ScreenUpdate),
 
@@ -92,6 +99,7 @@ impl TerminalEvent {
         match self {
             Self::SessionCreated { session_id } => session_id,
             Self::SessionDestroyed { session_id } => session_id,
+            Self::TerminalResized { session_id, .. } => session_id,
             Self::ScreenUpdate(update) => &update.session_id,
             Self::ScreenRefresh { session_id, .. } => session_id,
             Self::Bell { session_id } => session_id,
@@ -111,6 +119,7 @@ impl TerminalEvent {
         match self {
             Self::SessionCreated { .. } => "terminal://session-created",
             Self::SessionDestroyed { .. } => "terminal://session-destroyed",
+            Self::TerminalResized { .. } => "terminal://terminal-resized",
             Self::ScreenUpdate { .. } => "terminal://screen-update",
             Self::ScreenRefresh { .. } => "terminal://screen-refresh",
             Self::Bell { .. } => "terminal://bell",

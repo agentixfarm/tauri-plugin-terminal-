@@ -1,0 +1,59 @@
+{
+  "name": "@anthropic/tauri-plugin-terminal",
+  "version": "0.1.0",
+  "description": "TypeScript bindings and React components for tauri-plugin-terminal",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint guest-js react --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@types/react": "^19.0.0",
+    "eslint": "^9.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  },
+  "keywords": [
+    "tauri",
+    "terminal",
+    "plugin",
+    "pty",
+    "vt100",
+    "react"
+  ],
+  "author": "Agentix Farm <contact@agentix.farm>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentixfarm/tauri-plugin-terminal.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agentixfarm/tauri-plugin-terminal/issues"
+  },
+  "homepage": "https://github.com/agentixfarm/tauri-plugin-terminal#readme"
+}

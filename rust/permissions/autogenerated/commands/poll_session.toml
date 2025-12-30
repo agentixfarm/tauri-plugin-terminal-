@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-poll-session"
+description = "Enables the poll_session command without any pre-configured scope."
+commands.allow = ["poll_session"]
+
+[[permission]]
+identifier = "deny-poll-session"
+description = "Denies the poll_session command without any pre-configured scope."
+commands.deny = ["poll_session"]

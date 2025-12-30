@@ -1,0 +1,85 @@
+/**
+ * Custom CSS for tauri-plugin-terminal docs.
+ */
+
+:root {
+  --ifm-color-primary: #a855f7;
+  --ifm-color-primary-dark: #9333ea;
+  --ifm-color-primary-darker: #7c3aed;
+  --ifm-color-primary-darkest: #6d28d9;
+  --ifm-color-primary-light: #c084fc;
+  --ifm-color-primary-lighter: #d8b4fe;
+  --ifm-color-primary-lightest: #e9d5ff;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #c084fc;
+  --ifm-color-primary-dark: #a855f7;
+  --ifm-color-primary-darker: #9333ea;
+  --ifm-color-primary-darkest: #7c3aed;
+  --ifm-color-primary-light: #d8b4fe;
+  --ifm-color-primary-lighter: #e9d5ff;
+  --ifm-color-primary-lightest: #f3e8ff;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-background-color: #1e1e2e;
+}
+
+/* Code blocks */
+.prism-code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+}
+
+/* Terminal-like styling for code blocks */
+[data-theme='dark'] pre {
+  background: #1e1e2e !important;
+  border: 1px solid #313244;
+}
+
+/* Feature cards */
+.feature-card {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Hero section */
+.hero__title {
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+.hero__subtitle {
+  font-size: 1.5rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+/* Table styling */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: var(--ifm-color-emphasis-100);
+  font-weight: 600;
+}
+
+td, th {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+}
+
+/* Architecture diagram */
+pre.language-text {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}

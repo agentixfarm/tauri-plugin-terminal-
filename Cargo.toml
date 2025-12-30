@@ -1,0 +1,13 @@
+[workspace]
+members = ["rust"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Agentix Farm <contact@agentix.farm>"]
+repository = "https://github.com/agentixfarm/tauri-plugin-terminal"
+description = "A high-performance terminal plugin for Tauri applications"
+keywords = ["tauri", "terminal", "plugin", "pty", "vt100"]
+categories = ["gui", "development-tools"]

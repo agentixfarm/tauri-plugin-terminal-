@@ -117,19 +117,41 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 
     // Handle resize
     useEffect(() => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || charSize.width === 0) return;
 
-      const observer = new ResizeObserver(() => {
+      let resizeTimeout: NodeJS.Timeout | null = null;
+      let initialResizeTimeout: NodeJS.Timeout | null = null;
+
+      const handleResize = async () => {
         const size = calculateSize();
-        if (size) {
-          resize(size.cols, size.rows);
+        if (size && size.cols > 0 && size.rows > 0) {
+          await resize(size.cols, size.rows);
+          // Refresh screen to get updated size
+          await refresh();
           onResize?.(size.cols, size.rows);
         }
+      };
+
+      const observer = new ResizeObserver(() => {
+        // Debounce resize to avoid too many calls
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(handleResize, 50);
       });
 
       observer.observe(containerRef.current);
-      return () => observer.disconnect();
-    }, [calculateSize, resize, onResize]);
+
+      // Trigger initial resize calculation immediately
+      handleResize();
+
+      // Also trigger after a short delay to catch late layout updates
+      initialResizeTimeout = setTimeout(handleResize, 100);
+
+      return () => {
+        observer.disconnect();
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        if (initialResizeTimeout) clearTimeout(initialResizeTimeout);
+      };
+    }, [calculateSize, resize, refresh, onResize, charSize.width]);
 
     // Render to canvas
     useEffect(() => {

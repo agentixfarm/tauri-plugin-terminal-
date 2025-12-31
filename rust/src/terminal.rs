@@ -76,6 +76,10 @@ impl Terminal {
         let parser = self.parser.lock();
         let screen = parser.screen();
 
+        log::debug!("Terminal::get_screen: size={}x{}, parser_size={}x{}",
+            self.size.cols, self.size.rows,
+            screen.size().0, screen.size().1);
+
         let cells: Vec<Row> = (0..self.size.rows)
             .map(|row| {
                 (0..self.size.cols)

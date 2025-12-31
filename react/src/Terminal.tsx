@@ -144,6 +144,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const [charSize, setCharSize] = useState({ width: 0, height: 0 });
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+    const containerSizeRef = useRef({ width: 0, height: 0 });
     const [selection, setSelection] = useState<Selection | null>(null);
     const [isSelecting, setIsSelecting] = useState(false);
     const [scrollOffset, setScrollOffset] = useState(0);
@@ -270,6 +272,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       const cols = Math.floor(availableWidth / charSize.width);
       const rows = Math.floor(rect.height / charSize.height);
 
+      console.log(`[Terminal] calculateSize: container=${Math.round(rect.width)}x${Math.round(rect.height)}, charSize=${charSize.width.toFixed(1)}x${charSize.height.toFixed(1)}, cols=${cols}, rows=${rows}`);
+
       return { cols: Math.max(1, cols), rows: Math.max(1, rows) };
     }, [charSize, enableScrollback]);
 
@@ -282,21 +286,45 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 
       let resizeTimeout: NodeJS.Timeout | null = null;
       let rafId: number | null = null;
+      let isInitialResize = true;
 
       const handleResize = async () => {
+        if (!containerRef.current) return;
+
+        // Get container dimensions first
+        const rect = containerRef.current.getBoundingClientRect();
+
+        // Update container size state for rendering
+        setContainerSize({ width: rect.width, height: rect.height });
+
         const size = calculateSize();
         if (size && size.cols > 0 && size.rows > 0) {
-          // Skip if size hasn't changed
+          // Minimum size check - use very small minimums to avoid blocking valid resizes
+          const MIN_ROWS = 2;
+          const MIN_COLS = 10;
+          if (size.rows < MIN_ROWS || size.cols < MIN_COLS) {
+            console.log(`[Terminal] handleResize: skipping tiny size ${size.cols}x${size.rows} for session=${sessionId}`);
+            return;
+          }
+
+          // Skip if size hasn't changed (but always do initial resize)
           if (
+            !isInitialResize &&
             lastSizeRef.current?.cols === size.cols &&
             lastSizeRef.current?.rows === size.rows
           ) {
             return;
           }
+
+          console.log(`[Terminal] handleResize: session=${sessionId}, ${size.cols}x${size.rows}, container=${Math.round(rect.width)}x${Math.round(rect.height)}, isInitial=${isInitialResize}`);
           lastSizeRef.current = size;
+          isInitialResize = false;
 
           await resize(size.cols, size.rows);
           onResize?.(size.cols, size.rows);
+
+          // Force a refresh after resize to ensure we have the latest screen
+          await refresh();
         }
       };
 
@@ -311,18 +339,71 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
         }, 50);
       };
 
-      const observer = new ResizeObserver(debouncedResize);
+      const observer = new ResizeObserver((entries) => {
+        // Update container size immediately from ResizeObserver entry
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          console.log(`[Terminal] ResizeObserver: width=${Math.round(width)}, height=${Math.round(height)}`);
+          if (width > 0 && height > 0) {
+            setContainerSize({ width, height });
+            containerSizeRef.current = { width, height };
+          }
+        }
+        debouncedResize();
+      });
       observer.observe(containerRef.current);
 
-      // Initial resize
-      handleResize();
+      // Initial resize with multiple attempts to ensure container is properly sized
+      // Layout might not be ready immediately
+      const initialSizes = [50, 100, 200, 500, 1000];
+      const timeoutIds: NodeJS.Timeout[] = [];
+      initialSizes.forEach(delay => {
+        const tid = setTimeout(() => {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              const newSize = { width: rect.width, height: rect.height };
+              // Only update if size actually changed
+              if (containerSizeRef.current.width !== rect.width ||
+                  containerSizeRef.current.height !== rect.height) {
+                console.log(`[Terminal] Initial size check at ${delay}ms: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+                setContainerSize(newSize);
+                containerSizeRef.current = newSize;
+              }
+            }
+          }
+          handleResize();
+        }, delay);
+        timeoutIds.push(tid);
+      });
+
+      // Also set up an interval to periodically check for size changes
+      // This handles cases where ResizeObserver doesn't fire (e.g., nested panels)
+      const intervalId = setInterval(() => {
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            const widthChanged = Math.abs(containerSizeRef.current.width - rect.width) > 1;
+            const heightChanged = Math.abs(containerSizeRef.current.height - rect.height) > 1;
+            if (widthChanged || heightChanged) {
+              console.log(`[Terminal] Interval detected size change: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+              const newSize = { width: rect.width, height: rect.height };
+              setContainerSize(newSize);
+              containerSizeRef.current = newSize;
+              handleResize();
+            }
+          }
+        }
+      }, 500);
 
       return () => {
         observer.disconnect();
         if (resizeTimeout) clearTimeout(resizeTimeout);
         if (rafId) cancelAnimationFrame(rafId);
+        timeoutIds.forEach(tid => clearTimeout(tid));
+        clearInterval(intervalId);
       };
-    }, [calculateSize, resize, onResize, charSize.width]);
+    }, [calculateSize, resize, refresh, onResize, charSize.width]);
 
     // Render cell helper
     const renderCell = useCallback(
@@ -457,6 +538,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
         return;
 
       const canvas = canvasRef.current;
+      const container = containerRef.current;
       const offscreen = offscreenCanvasRef.current;
       const ctx = canvas.getContext("2d", { alpha: false });
       const offCtx = offscreen.getContext("2d", { alpha: false });
@@ -465,24 +547,38 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       // Handle device pixel ratio for sharp text on Retina displays
       const dpr = window.devicePixelRatio || 1;
 
-      // Get container size
-      const containerRect = containerRef.current.getBoundingClientRect();
+      // ALWAYS get fresh dimensions from the container
+      // This ensures we render at the correct size even if containerSize state is stale
+      const rect = container.getBoundingClientRect();
       const scrollbarWidth = enableScrollback ? 12 : 0;
-      const width = containerRect.width - scrollbarWidth;
-      const height = containerRect.height;
+      const width = rect.width - scrollbarWidth;
+      const height = rect.height;
 
-      // Set canvas sizes
+      // Skip rendering if container has no size yet
+      if (width <= 0 || height <= 0) {
+        console.log(`[Terminal] render: skipping, container has no size yet`);
+        return;
+      }
+
+      console.log(`[Terminal] render: fresh rect=${Math.round(rect.width)}x${Math.round(rect.height)}, effective=${Math.round(width)}x${Math.round(height)}`);
+
+      // Set canvas pixel buffer size for sharp rendering on Retina displays
       const scaledWidth = Math.ceil(width * dpr);
       const scaledHeight = Math.ceil(height * dpr);
 
+      // Only update canvas buffer dimensions if they changed
       if (canvas.width !== scaledWidth || canvas.height !== scaledHeight) {
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
         offscreen.width = scaledWidth;
         offscreen.height = scaledHeight;
+        console.log(`[Terminal] canvas buffer resized to ${scaledWidth}x${scaledHeight} (dpr=${dpr})`);
       }
+
+      // CRITICAL: Set canvas CSS display size in pixels, not percentage
+      // CSS percentage sizing on canvas elements conflicts with the internal buffer
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
 
       // Reset transform and scale for DPR on offscreen canvas
       offCtx.resetTransform();
@@ -497,20 +593,38 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       offCtx.textBaseline = "alphabetic";
       offCtx.imageSmoothingEnabled = false;
 
-      // Render cells
-      for (let row = 0; row < screen.cells.length; row++) {
-        const rowCells = screen.cells[row];
-        if (!rowCells) continue;
+      // Calculate how many rows/cols fit in the container
+      // Use the maximum of: screen.size (what backend reports) or container-calculated size
+      // This ensures we always render to fill the visible area
+      const containerCols = Math.floor(width / charSize.width);
+      const containerRows = Math.floor(height / charSize.height);
+      const renderCols = Math.max(screen.size.cols, containerCols, screen.cells[0]?.length || 0);
+      const renderRows = Math.max(screen.size.rows, containerRows, screen.cells.length);
 
+      console.log(`[Terminal] render: session=${sessionId}, canvas=${Math.round(width)}x${Math.round(height)}, screen.size=${screen.size.cols}x${screen.size.rows}, cells=${screen.cells[0]?.length || 0}x${screen.cells.length}, container=${containerCols}x${containerRows}, render=${renderCols}x${renderRows}`);
+
+      // Render cells - iterate over the full render area
+      // The cells array from backend may be smaller than the visible area during resize
+      // Always render background for the full area, then overlay cell content
+      for (let row = 0; row < renderRows; row++) {
+        const rowCells = screen.cells[row];
         const y = row * charSize.height;
 
-        for (let col = 0; col < rowCells.length; col++) {
-          const cell = rowCells[col];
-          if (!cell) continue;
-
+        for (let col = 0; col < renderCols; col++) {
+          const cell = rowCells?.[col];
           const x = col * charSize.width;
           const selected = isCellSelected(row, col);
           const searchHighlight = getCellSearchHighlight(row, col);
+
+          // If no cell data, render empty cell with theme background
+          if (!cell) {
+            // Draw background
+            offCtx.fillStyle = selected
+              ? colorToCss(theme.selection)
+              : colorToCss(theme.background);
+            offCtx.fillRect(x, y, charSize.width, charSize.height);
+            continue;
+          }
 
           // Render cell with appropriate highlight
           if (searchHighlight === "current") {
@@ -638,6 +752,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       renderCell,
       isCellSelected,
       getCellSearchHighlight,
+      containerSize,
     ]);
 
     // Extract selected text
@@ -988,6 +1103,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
         ref={containerRef}
         className={className}
         style={{
+          // Use absolute positioning to fill the parent container completely
+          // This is more reliable than percentage-based sizing for terminal containers
           position: "absolute",
           top: 0,
           left: 0,
@@ -1005,6 +1122,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
           ref={canvasRef}
           style={{
             display: "block",
+            // Canvas size is set programmatically in render effect via explicit pixels
+            // No positioning needed - render effect sets width/height directly
             cursor: hoveredLink ? "pointer" : "text",
           }}
           onMouseDown={handleMouseDown}

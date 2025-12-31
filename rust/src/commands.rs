@@ -83,7 +83,10 @@ pub async fn resize_session<R: Runtime>(
     cols: u16,
     rows: u16,
 ) -> Result<()> {
-    state.manager.resize(&session_id, cols, rows)
+    log::info!("resize_session called: session={}, cols={}, rows={}", session_id, cols, rows);
+    let result = state.manager.resize(&session_id, cols, rows);
+    log::info!("resize_session completed: {:?}", result);
+    result
 }
 
 /// Get the full screen state.
@@ -93,7 +96,11 @@ pub async fn get_screen<R: Runtime>(
     state: State<'_, TerminalState>,
     session_id: String,
 ) -> Result<Screen> {
-    state.manager.get_screen(&session_id)
+    let screen = state.manager.get_screen(&session_id)?;
+    log::info!("get_screen: session={}, size={}x{}, cells_rows={}, cells_cols={}",
+        session_id, screen.size.cols, screen.size.rows,
+        screen.cells.len(), screen.cells.first().map(|r| r.len()).unwrap_or(0));
+    Ok(screen)
 }
 
 /// Process pending output for a session and get updates.

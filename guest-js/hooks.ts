@@ -28,11 +28,57 @@ export function useTerminal(sessionId: string | null) {
   const [isAlive, setIsAlive] = useState(true);
   const unlistenRef = useRef<UnlistenFn[]>([]);
 
-  // Apply screen update
+  // Apply screen update - handles both incremental updates and full refreshes
   const applyUpdate = useCallback((update: ScreenUpdate) => {
     setScreen((prev) => {
       if (!prev) return prev;
 
+      // Check if screen size changed - if so, we need to rebuild cells array
+      const sizeChanged = update.changes.some(
+        (change) =>
+          change.row >= prev.cells.length ||
+          (prev.cells[change.row] && change.col >= prev.cells[change.row].length)
+      );
+
+      if (sizeChanged) {
+        // Size changed, need to expand or rebuild the cells array
+        // Find max dimensions from changes
+        let maxRow = prev.cells.length - 1;
+        let maxCol = prev.cells[0]?.length - 1 || 0;
+
+        for (const change of update.changes) {
+          if (change.row > maxRow) maxRow = change.row;
+          if (change.col > maxCol) maxCol = change.col;
+        }
+
+        // Create new cells array with proper dimensions
+        const newCells = [];
+        for (let row = 0; row <= maxRow; row++) {
+          const newRow = [];
+          for (let col = 0; col <= maxCol; col++) {
+            // Copy existing cell or create empty
+            newRow.push(prev.cells[row]?.[col] || { char: '', fg: { r: 255, g: 255, b: 255 }, bg: { r: 0, g: 0, b: 0 }, attrs: {} });
+          }
+          newCells.push(newRow);
+        }
+
+        // Apply changes
+        for (const change of update.changes) {
+          if (newCells[change.row]) {
+            newCells[change.row][change.col] = change.cell;
+          }
+        }
+
+        return {
+          ...prev,
+          cells: newCells,
+          cursor: update.cursor,
+          title: update.title ?? prev.title,
+          size: { cols: maxCol + 1, rows: maxRow + 1 },
+        };
+      }
+
+      // Normal incremental update
       const newCells = [...prev.cells.map((row) => [...row])];
       for (const change of update.changes) {
         if (newCells[change.row]) {
@@ -137,14 +183,17 @@ export function useTerminal(sessionId: string | null) {
     [sessionId]
   );
 
-  // Resize terminal with confirmation
+  // Resize terminal with confirmation and retry logic
   const resize = useCallback(
     async (cols: number, rows: number) => {
       if (!sessionId) return;
       try {
+        console.log(`[useTerminal] resize: requesting ${cols}x${rows} for session=${sessionId}`);
+
         // Set up a promise that resolves when we receive resize confirmation
         const resizePromise = new Promise<void>((resolve) => {
           const handleResize = async (event: { payload: { session_id: string; cols: number; rows: number } }) => {
+            console.log(`[useTerminal] resize: received confirmation event ${event.payload.cols}x${event.payload.rows}`);
             if (event.payload.session_id === sessionId &&
                 event.payload.cols === cols &&
                 event.payload.rows === rows) {
@@ -173,13 +222,31 @@ export function useTerminal(sessionId: string | null) {
         // Wait for resize confirmation or timeout
         await resizePromise;
 
-        // Small additional delay for shell to process SIGWINCH
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Retry fetching screen until it matches expected size or max retries
+        const maxRetries = 8;
+        const retryDelays = [10, 20, 50, 100, 150, 200, 300, 500];
 
-        // Fetch updated screen
-        const s = await api.getScreen(sessionId);
-        setScreen(s);
+        for (let i = 0; i < maxRetries; i++) {
+          await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
+
+          const s = await api.getScreen(sessionId);
+          console.log(`[useTerminal] resize: retry ${i+1}/${maxRetries}, got screen ${s.size.cols}x${s.size.rows}, cells=${s.cells[0]?.length || 0}x${s.cells.length}`);
+
+          // Check if screen size matches what we requested
+          if (s.size.cols === cols && s.size.rows === rows) {
+            console.log(`[useTerminal] resize: size matches, updating screen`);
+            setScreen(s);
+            return;
+          }
+
+          // If this is the last retry, use whatever we got but log a warning
+          if (i === maxRetries - 1) {
+            console.warn(`[useTerminal] resize: final retry, using screen ${s.size.cols}x${s.size.rows} (requested ${cols}x${rows})`);
+            setScreen(s);
+          }
+        }
       } catch (e) {
+        console.error(`[useTerminal] resize error:`, e);
         setError(e instanceof Error ? e : new Error(String(e)));
       }
     },
